@@ -218,7 +218,7 @@ def plan():
         
         actual_days = min(actual_days, days)
         
-        food_keywords = ['特色美食', '当地小吃', '餐厅', '美食']
+        food_keywords = ['特色美食', '当地小吃', '餐厅', '美食', '小吃', '地方菜', '老字号', '特色小吃']
         food_recommendations = []
         seen_food_ids = set()
         
@@ -227,7 +227,7 @@ def plan():
                 food_result = client.search_poi(
                     keyword=keyword,
                     city=city,
-                    offset=20
+                    offset=40
                 )
                 food_list = parse_poi_list(food_result)
                 
@@ -237,12 +237,12 @@ def plan():
                         if food.get('rating') and food.get('photo'):
                             food_recommendations.append(food)
                 
-                if len(food_recommendations) >= 5:
+                if len(food_recommendations) >= 10:
                     break
             except:
                 continue
         
-        food_recommendations = food_recommendations[:5]
+        food_recommendations = food_recommendations[:10]
         
         hotel_keywords = ['酒店', '宾馆', '住宿']
         hotel_recommendations = []
