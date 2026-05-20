@@ -50,8 +50,8 @@ def plan():
         if days < 1 or days > 7:
             return jsonify({'ok': False, 'message': '出行天数需在1-7天之间'})
         
-        if spots_per_day < 1 or spots_per_day > 3:
-            return jsonify({'ok': False, 'message': '每天景点数需在1-3之间'})
+        if spots_per_day < 1 or spots_per_day > 5:
+            return jsonify({'ok': False, 'message': '每天景点数需在1-5之间'})
         
         if not city or not api_key:
             return jsonify({'ok': False, 'message': '请填写城市和API Key'})

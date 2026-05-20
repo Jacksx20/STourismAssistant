@@ -91,8 +91,8 @@ document.getElementById('travelForm').addEventListener('submit', async function(
         return;
     }
     
-    if (spotsPerDay < 1 || spotsPerDay > 3) {
-        alert('每天游玩景点数需在1-3之间');
+    if (spotsPerDay < 1 || spotsPerDay > 5) {
+        alert('每天游玩景点数需在1-5之间');
         return;
     }
     
