@@ -400,6 +400,26 @@ body::before {
     margin-bottom: 5px;
 }
 
+.spot-intro {
+    font-size: 12px;
+    color: #888;
+    line-height: 1.5;
+    margin-bottom: 6px;
+}
+
+.spot-detail-link {
+    display: inline-block;
+    font-size: 12px;
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.spot-detail-link:hover {
+    color: #764ba2;
+}
+
 .schedule-item {
     padding: 12px;
     margin-bottom: 10px;

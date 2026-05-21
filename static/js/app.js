@@ -251,6 +251,8 @@ function renderResult(data) {
                             <div class="spot-number" style="background: ${color.bg};">${i + 1}</div>
                             <div class="spot-name">${spot.name}</div>
                             <div class="spot-address">${spot.address || '暂无地址'}</div>
+                            ${spot.intro ? `<div class="spot-intro">${spot.intro.length > 60 ? spot.intro.substring(0, 60) + '...' : spot.intro}</div>` : ''}
+                            ${spot.detail_url ? `<a href="${spot.detail_url}" target="_blank" class="spot-detail-link">查看详情 ></a>` : ''}
                         </div>
                     `).join('')}
                 </div>
