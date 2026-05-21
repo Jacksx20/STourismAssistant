@@ -175,84 +175,125 @@ function renderResult(data) {
                 }).join('')}
             </div>
             <div class="map-mode-tabs" id="mapModeTabs">
-                <div class="map-mode-tab active" data-mode="car">🚗 驾车</div>
-                <div class="map-mode-tab" data-mode="bus">🚌 公交</div>
-                <div class="map-mode-tab" data-mode="walk">🚶 步行</div>
+                <div class="map-mode-tab active" data-mode="driving">🚗 驾车</div>
+                <div class="map-mode-tab" data-mode="transit">🚌 公交</div>
+                <div class="map-mode-tab" data-mode="walking">🚶 步行</div>
             </div>
             <div class="map-description" id="mapDescription"></div>
-            <div class="map-actions">
-                <a href="#" target="_blank" class="map-btn" id="navLink">🗺️ 在高德地图中查看导航</a>
-                <a href="#" target="_blank" class="map-btn" id="taxiLink">🚕 一键打车</a>
-            </div>
+            <div class="map-container" id="mapContainer"></div>
             <div class="map-img-wrap" id="mapImgWrap"></div>
         </div>`;
 
     content.innerHTML = html;
 
-    const apiKey = document.getElementById('apiKey').value.trim();
+    const jsApiKey = document.getElementById('jsApiKey').value.trim();
+    const serverApiKey = document.getElementById('apiKey').value.trim();
     const mapData = data.daily_plans.map(day => ({
         url: day.map_url,
         spots: day.map_spots || day.spots.map(s => ({ name: s.name, location: s.location || '' })),
         spotNames: day.spots.map(s => s.name)
     }));
 
+    const useInteractive = !!jsApiKey;
+    if (useInteractive) {
+        document.getElementById('mapImgWrap').style.display = 'none';
+    } else {
+        document.getElementById('mapContainer').style.display = 'none';
+    }
+
+    const markerColors = ['#667eea', '#f5576c', '#4facfe', '#43e97b', '#fa709a', '#a18cd1', '#ff9a9e'];
     const markerColorHex = ['0x667eea', '0xf5576c', '0x4facfe', '0x43e97b', '0xfa709a', '0xa18cd1', '0xff9a9e'];
     let currentDayIdx = 'overview';
-    let currentMode = 'car';
+    let currentMode = 'driving';
 
-    function buildStaticMapUrl(markersList) {
-        if (markersList.length === 0) return '';
-        const center = markersList[0].location;
-        const markerStr = markersList.map(m => `mid,${m.color},S:${m.label}:${m.location}`).join('|');
-        return `https://restapi.amap.com/v3/staticmap?location=${center}&zoom=11&size=800*500&markers=${encodeURIComponent(markerStr)}&key=${apiKey}`;
-    }
+    if (useInteractive) {
+        let amap = null;
+        let overlays = [];
 
-    function buildNavUrl(spots, mode) {
-        if (spots.length < 2 || !spots[0].location || !spots[spots.length - 1].location) return '#';
-        const from = spots[0], to = spots[spots.length - 1];
-        const viaArr = spots.slice(1, -1).filter(s => s.location).map(s => `${s.location},${s.name}`);
-        const viaStr = viaArr.length > 0 ? '&via=' + encodeURIComponent(viaArr.join('|')) : '';
-        return `https://uri.amap.com/navigation?from=${from.location},${from.name}&to=${to.location},${to.name}${viaStr}&mode=${mode}&callnative=0&src=${data.city}旅行攻略`;
-    }
-
-    function buildTaxiUrl(spots) {
-        if (spots.length < 2 || !spots[0].location || !spots[spots.length - 1].location) return '#';
-        return `https://uri.amap.com/taxi?from=${spots[0].location},${spots[0].name}&to=${spots[spots.length-1].location},${spots[spots.length-1].name}&callnative=0`;
-    }
-
-    function updateMap(dayIdx) {
-        currentDayIdx = dayIdx;
-        const wrapEl = document.getElementById('mapImgWrap');
-        const descEl = document.getElementById('mapDescription');
-        const navEl = document.getElementById('navLink');
-        const taxiEl = document.getElementById('taxiLink');
-
-        let imgSrc = '';
-        if (dayIdx === 'overview') {
-            const allMarkers = [];
-            mapData.forEach((dayInfo, dayI) => {
-                const color = markerColorHex[dayI % markerColorHex.length];
-                dayInfo.spots.forEach((spot, spotI) => {
-                    if (spot.location) allMarkers.push({ location: spot.location, color, label: `D${dayI+1}-${spotI+1}` });
-                });
+        function loadAmap() {
+            return new Promise((resolve, reject) => {
+                if (window.AMap) { resolve(); return; }
+                const s = document.createElement('script');
+                s.src = `https://webapi.amap.com/maps?v=2.0&key=${jsApiKey}&plugin=AMap.Driving,AMap.Transfer,AMap.Walking`;
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
             });
-            imgSrc = buildStaticMapUrl(allMarkers);
-            descEl.textContent = `总览：共${mapData.length}天行程，${mapData.reduce((s, d) => s + d.spotNames.length, 0)}个景点`;
-            const firstDay = mapData[0];
-            navEl.href = firstDay ? buildNavUrl(firstDay.spots, currentMode) : '#';
-            taxiEl.href = firstDay ? buildTaxiUrl(firstDay.spots) : '#';
-        } else {
-            const dayInfo = mapData[dayIdx];
-            if (!dayInfo) return;
-            const color = markerColorHex[dayIdx % markerColorHex.length];
-            const markers = dayInfo.spots.filter(s => s.location).map((spot, i) => ({ location: spot.location, color, label: String(i + 1) }));
-            imgSrc = buildStaticMapUrl(markers);
-            descEl.textContent = `第${dayIdx + 1}天路线：${dayInfo.spotNames.join(' → ')}`;
-            navEl.href = buildNavUrl(dayInfo.spots, currentMode);
-            taxiEl.href = buildTaxiUrl(dayInfo.spots);
         }
 
-        wrapEl.innerHTML = `<img class="map-img" src="${imgSrc}" alt="路线地图" onerror="this.parentElement.innerHTML='<div class=\\'map-fallback\\'>点击上方按钮在高德地图中查看路线</div>'">`;
+        function clearOverlays() {
+            overlays.forEach(o => { try { if (o.clear) o.clear(); else if (o.setMap) o.setMap(null); } catch(e){} });
+            overlays = [];
+        }
+
+        function addMarkers(spots, color, prefix) {
+            spots.forEach((spot, i) => {
+                if (!spot.location) return;
+                const [lng, lat] = spot.location.split(',').map(Number);
+                if (isNaN(lng) || isNaN(lat)) return;
+                const m = new AMap.Marker({
+                    position: [lng, lat], title: spot.name,
+                    label: { content: `<span style="background:${color};color:#fff;padding:2px 8px;border-radius:10px;font-size:12px;white-space:nowrap;">${prefix ? prefix + (i+1) : (i+1)}. ${spot.name}</span>`, direction: 'top' },
+                    zIndex: 100
+                });
+                amap.add(m); overlays.push(m);
+            });
+        }
+
+        function drawRoute(spots, mode) {
+            const pts = spots.filter(s => s.location).map(s => { const p = s.location.split(',').map(Number); return isNaN(p[0])||isNaN(p[1]) ? null : [p[0],p[1]]; }).filter(Boolean);
+            if (pts.length < 2) return;
+            const origin = new AMap.LngLat(pts[0][0], pts[0][1]);
+            const dest = new AMap.LngLat(pts[pts.length-1][0], pts[pts.length-1][1]);
+            const midPts = pts.slice(1, -1).map(p => new AMap.LngLat(p[0], p[1]));
+            const opts = midPts.length > 0 ? { waypoints: midPts } : undefined;
+            if (mode === 'driving') { const d = new AMap.Driving({ map: amap, autoFitView: false }); d.search(origin, dest, opts, ()=>{}); overlays.push(d); }
+            else if (mode === 'transit') { const t = new AMap.Transfer({ map: amap, autoFitView: false, city: data.city }); t.search(origin, dest); overlays.push(t); }
+            else { const w = new AMap.Walking({ map: amap, autoFitView: false }); w.search(origin, dest, opts, ()=>{}); overlays.push(w); }
+        }
+
+        async function updateMap(dayIdx) {
+            currentDayIdx = dayIdx;
+            try { await loadAmap(); } catch(e) { useInteractive = false; updateMap(dayIdx); return; }
+            if (!amap) { amap = new AMap.Map('mapContainer', { zoom: 11, resizeEnable: true }); }
+            clearOverlays();
+            if (dayIdx === 'overview') {
+                mapData.forEach((dayInfo, idx) => { addMarkers(dayInfo.spots, markerColors[idx % markerColors.length], `D${idx+1}-`); if (currentMode === 'driving') drawRoute(dayInfo.spots, 'driving'); });
+                document.getElementById('mapDescription').textContent = `总览：共${mapData.length}天行程，${mapData.reduce((s, d) => s + d.spotNames.length, 0)}个景点`;
+            } else {
+                const dayInfo = mapData[dayIdx]; if (!dayInfo) return;
+                addMarkers(dayInfo.spots, markerColors[dayIdx % markerColors.length], '');
+                drawRoute(dayInfo.spots, currentMode);
+                document.getElementById('mapDescription').textContent = `第${dayIdx + 1}天路线：${dayInfo.spotNames.join(' → ')}`;
+            }
+            amap.setFitView();
+        }
+    } else {
+        function buildStaticMapUrl(markersList) {
+            if (markersList.length === 0) return '';
+            const center = markersList[0].location;
+            const markerStr = markersList.map(m => `mid,${m.color},S:${m.label}:${m.location}`).join('|');
+            return `https://restapi.amap.com/v3/staticmap?location=${center}&zoom=11&size=800*500&markers=${encodeURIComponent(markerStr)}&key=${serverApiKey}`;
+        }
+
+        function updateMap(dayIdx) {
+            currentDayIdx = dayIdx;
+            const wrapEl = document.getElementById('mapImgWrap');
+            const descEl = document.getElementById('mapDescription');
+            let imgSrc = '';
+            if (dayIdx === 'overview') {
+                const allMarkers = [];
+                mapData.forEach((dayInfo, dayI) => { dayInfo.spots.forEach((spot, spotI) => { if (spot.location) allMarkers.push({ location: spot.location, color: markerColorHex[dayI % markerColorHex.length], label: `D${dayI+1}-${spotI+1}` }); }); });
+                imgSrc = buildStaticMapUrl(allMarkers);
+                descEl.textContent = `总览：共${mapData.length}天行程，${mapData.reduce((s, d) => s + d.spotNames.length, 0)}个景点（填写JS API Key可显示交互地图）`;
+            } else {
+                const dayInfo = mapData[dayIdx]; if (!dayInfo) return;
+                const markers = dayInfo.spots.filter(s => s.location).map((spot, i) => ({ location: spot.location, color: markerColorHex[dayIdx % markerColorHex.length], label: String(i + 1) }));
+                imgSrc = buildStaticMapUrl(markers);
+                descEl.textContent = `第${dayIdx + 1}天路线：${dayInfo.spotNames.join(' → ')}`;
+            }
+            wrapEl.innerHTML = `<img class="map-img" src="${imgSrc}" alt="路线地图" onerror="this.parentElement.innerHTML='<div class=\\'map-fallback\\'>静态地图加载失败</div>'">`;
+        }
     }
 
     document.querySelectorAll('.map-tab').forEach(tab => {
