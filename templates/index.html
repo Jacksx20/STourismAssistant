@@ -64,7 +64,15 @@
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-content">
                 <div class="loading-spinner"></div>
-                <p>正在智能规划中，请稍候...</p>
+                <p class="loading-text">正在智能规划中，请稍候...</p>
+                <div class="loading-progress-bar">
+                    <div class="loading-progress-fill" id="progressFill"></div>
+                </div>
+                <div class="loading-progress-info">
+                    <span id="progressPercent">0%</span>
+                    <span id="progressTime">预计剩余 --</span>
+                </div>
+                <div class="loading-step" id="progressStep"></div>
             </div>
         </div>
         

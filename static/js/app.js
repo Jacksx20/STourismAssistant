@@ -100,6 +100,51 @@ document.getElementById('travelForm').addEventListener('submit', async function(
     submitBtn.disabled = true;
     document.getElementById('loadingOverlay').style.display = 'flex';
     
+    const progressSteps = [
+        { percent: 5, step: '正在解析目的地信息...' },
+        { percent: 15, step: '正在获取地理坐标...' },
+        { percent: 25, step: '正在查询天气预报...' },
+        { percent: 35, step: '正在搜索热门景点...' },
+        { percent: 50, step: '正在获取景点详情...' },
+        { percent: 60, step: '正在智能排序路线...' },
+        { percent: 70, step: '正在规划每日行程...' },
+        { percent: 80, step: '正在搜索美食推荐...' },
+        { percent: 88, step: '正在搜索住宿推荐...' },
+        { percent: 95, step: '正在生成旅行方案...' }
+    ];
+    
+    let progressTimer = null;
+    let currentStepIdx = 0;
+    const startTime = Date.now();
+    const estimatedTotalMs = days * spotsPerDay * 3000 + 8000;
+    
+    function updateProgress() {
+        if (currentStepIdx >= progressSteps.length) return;
+        const step = progressSteps[currentStepIdx];
+        const fill = document.getElementById('progressFill');
+        const percentEl = document.getElementById('progressPercent');
+        const timeEl = document.getElementById('progressTime');
+        const stepEl = document.getElementById('progressStep');
+        
+        fill.style.width = step.percent + '%';
+        percentEl.textContent = step.percent + '%';
+        stepEl.textContent = step.step;
+        
+        const elapsed = Date.now() - startTime;
+        const remainMs = Math.max(0, estimatedTotalMs - elapsed);
+        if (remainMs > 0) {
+            const secs = Math.ceil(remainMs / 1000);
+            timeEl.textContent = '预计剩余 ' + secs + ' 秒';
+        } else {
+            timeEl.textContent = '即将完成...';
+        }
+        
+        currentStepIdx++;
+    }
+    
+    updateProgress();
+    progressTimer = setInterval(updateProgress, 2500);
+    
     const formData = {
         api_key: document.getElementById('apiKey').value.trim(),
         city: document.getElementById('city').value.trim(),
@@ -129,8 +174,19 @@ document.getElementById('travelForm').addEventListener('submit', async function(
     } catch (error) {
         alert('网络错误，请重试');
     } finally {
-        submitBtn.disabled = false;
-        document.getElementById('loadingOverlay').style.display = 'none';
+        clearInterval(progressTimer);
+        const fill = document.getElementById('progressFill');
+        const percentEl = document.getElementById('progressPercent');
+        const timeEl = document.getElementById('progressTime');
+        const stepEl = document.getElementById('progressStep');
+        fill.style.width = '100%';
+        percentEl.textContent = '100%';
+        timeEl.textContent = '规划完成';
+        stepEl.textContent = '';
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }, 500);
     }
 });
 
