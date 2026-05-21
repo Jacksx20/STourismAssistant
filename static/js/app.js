@@ -313,48 +313,195 @@ function renderResult(data) {
         <div class="map-section">
             <h2>🗺️ 路线地图</h2>
             <div class="map-tabs" id="mapTabs">
+                <div class="map-tab active" data-day="overview">总览</div>
                 ${data.daily_plans.map((day, idx) => {
                     const spots = day.spots_names || day.spots.map(s => s.name);
-                    const routeText = spots.slice(0, 3).join(' → ');
-                    return `<div class="map-tab ${idx === 0 ? 'active' : ''}" data-day="${idx}">第${day.day}天 ${routeText}</div>`;
+                    const routeText = spots.length > 3 ? spots.slice(0, 3).join(' → ') + ' ...' : spots.join(' → ');
+                    return `<div class="map-tab" data-day="${idx}">第${day.day}天 ${routeText}</div>`;
                 }).join('')}
+            </div>
+            <div class="map-mode-tabs" id="mapModeTabs">
+                <div class="map-mode-tab active" data-mode="driving">🚗 驾车</div>
+                <div class="map-mode-tab" data-mode="transit">🚌 公交</div>
+                <div class="map-mode-tab" data-mode="walking">🚶 步行</div>
             </div>
             <div class="map-description" id="mapDescription"></div>
             <div class="map-actions">
-                <a href="#" target="_blank" class="map-btn" id="navLink">查看驾车导航</a>
-                <a href="#" target="_blank" class="map-btn" id="taxiLink">一键打车</a>
+                <a href="#" target="_blank" class="map-btn" id="navLink">在高德地图中查看</a>
             </div>
-            <iframe id="mapIframe" class="map-iframe" src=""></iframe>
+            <div id="mapContainer" class="map-container"></div>
         </div>
     `;
     
     content.innerHTML = html;
     
+    const apiKey = document.getElementById('apiKey').value.trim();
     const mapData = data.daily_plans.map(day => ({
         url: day.map_url,
-        spots: day.spots.map(s => s.name)
+        spots: day.map_spots || day.spots.map(s => ({ name: s.name, location: s.location || '' })),
+        spotNames: day.spots.map(s => s.name)
     }));
     
-    function updateMap(dayIdx) {
-        const mapInfo = mapData[dayIdx];
-        if (mapInfo && mapInfo.url) {
-            document.getElementById('mapIframe').src = mapInfo.url;
-            document.getElementById('navLink').href = mapInfo.url;
-            document.getElementById('taxiLink').href = mapInfo.url;
-            document.getElementById('mapDescription').textContent = 
-                `路线：${mapInfo.spots.join(' → ')}`;
+    const dayColorsMap = ['#667eea', '#f5576c', '#4facfe', '#43e97b', '#fa709a', '#a18cd1', '#ff9a9e'];
+    let amapInstance = null;
+    let currentDayIdx = 'overview';
+    let currentMode = 'driving';
+    let routeRenderers = [];
+    let markersLayer = [];
+    
+    function loadAmapScript() {
+        return new Promise((resolve) => {
+            if (window.AMap) { resolve(); return; }
+            const script = document.createElement('script');
+            script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
+            script.onload = resolve;
+            document.head.appendChild(script);
+        });
+    }
+    
+    function clearMapOverlays() {
+        routeRenderers.forEach(r => { try { if (r.clear) r.clear(); } catch(e){} });
+        markersLayer.forEach(m => { try { amapInstance.remove(m); } catch(e){} });
+        routeRenderers = [];
+        markersLayer = [];
+    }
+    
+    function addMarkers(spots, color, labelPrefix) {
+        spots.forEach((spot, i) => {
+            if (!spot.location) return;
+            const parts = spot.location.split(',').map(Number);
+            const lng = parts[0], lat = parts[1];
+            if (isNaN(lng) || isNaN(lat)) return;
+            const marker = new AMap.Marker({
+                position: [lng, lat],
+                title: spot.name,
+                label: {
+                    content: `<span style="background:${color};color:#fff;padding:2px 8px;border-radius:10px;font-size:12px;white-space:nowrap;">${labelPrefix ? labelPrefix + (i+1) : (i+1)}. ${spot.name}</span>`,
+                    direction: 'top'
+                },
+                zIndex: 100
+            });
+            amapInstance.add(marker);
+            markersLayer.push(marker);
+        });
+    }
+    
+    function drawRoute(spots, color, mode) {
+        if (spots.length < 2) return;
+        const waypoints = spots.filter(s => s.location).map(s => {
+            const parts = s.location.split(',').map(Number);
+            return [parts[0], parts[1]];
+        }).filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+        
+        if (waypoints.length < 2) return;
+        
+        const origin = waypoints[0];
+        const destination = waypoints[waypoints.length - 1];
+        const midWaypoints = waypoints.slice(1, -1);
+        
+        if (mode === 'driving') {
+            const driving = new AMap.Driving({
+                map: amapInstance,
+                autoFitView: true
+            });
+            const drivingOpts = midWaypoints.length > 0
+                ? { waypoints: midWaypoints.map(p => new AMap.LngLat(p[0], p[1])) }
+                : undefined;
+            driving.search(
+                new AMap.LngLat(origin[0], origin[1]),
+                new AMap.LngLat(destination[0], destination[1]),
+                drivingOpts,
+                () => {}
+            );
+            routeRenderers.push(driving);
+        } else if (mode === 'transit') {
+            const transit = new AMap.Transfer({
+                map: amapInstance,
+                autoFitView: true,
+                city: data.city
+            });
+            transit.search(
+                new AMap.LngLat(origin[0], origin[1]),
+                new AMap.LngLat(destination[0], destination[1])
+            );
+            routeRenderers.push(transit);
+        } else {
+            const walking = new AMap.Walking({
+                map: amapInstance,
+                autoFitView: true
+            });
+            const walkingOpts = midWaypoints.length > 0
+                ? { waypoints: midWaypoints.map(p => new AMap.LngLat(p[0], p[1])) }
+                : undefined;
+            walking.search(
+                new AMap.LngLat(origin[0], origin[1]),
+                new AMap.LngLat(destination[0], destination[1]),
+                walkingOpts,
+                () => {}
+            );
+            routeRenderers.push(walking);
         }
+    }
+    
+    async function updateMap(dayIdx) {
+        currentDayIdx = dayIdx;
+        await loadAmapScript();
+        
+        if (!amapInstance) {
+            amapInstance = new AMap.Map('mapContainer', {
+                zoom: 11,
+                resizeEnable: true
+            });
+        }
+        
+        clearMapOverlays();
+        
+        if (dayIdx === 'overview') {
+            mapData.forEach((dayInfo, idx) => {
+                const color = dayColorsMap[idx % dayColorsMap.length];
+                addMarkers(dayInfo.spotsNames.map((name, i) => ({
+                    name,
+                    location: dayInfo.spots[i] ? dayInfo.spots[i].location : ''
+                })), color, `D${idx+1}-`);
+                if (currentMode === 'driving') {
+                    drawRoute(dayInfo.spots, color, 'driving');
+                }
+            });
+            document.getElementById('mapDescription').textContent = 
+                `总览：共${mapData.length}天行程，${mapData.reduce((s, d) => s + d.spotNames.length, 0)}个景点`;
+            const firstUrl = mapData[0] && mapData[0].url ? mapData[0].url : '#';
+            document.getElementById('navLink').href = firstUrl;
+        } else {
+            const dayInfo = mapData[dayIdx];
+            if (!dayInfo) return;
+            const color = dayColorsMap[dayIdx % dayColorsMap.length];
+            addMarkers(dayInfo.spots, color, '');
+            drawRoute(dayInfo.spots, color, currentMode);
+            document.getElementById('mapDescription').textContent = 
+                `第${dayIdx + 1}天路线：${dayInfo.spotNames.join(' → ')}`;
+            document.getElementById('navLink').href = dayInfo.url || '#';
+        }
+        
+        amapInstance.setFitView();
     }
     
     document.querySelectorAll('.map-tab').forEach(tab => {
         tab.addEventListener('click', function() {
             document.querySelectorAll('.map-tab').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
-            updateMap(parseInt(this.dataset.day));
+            const dayVal = this.dataset.day;
+            updateMap(dayVal === 'overview' ? 'overview' : parseInt(dayVal));
         });
     });
     
-    if (mapData.length > 0 && mapData[0].url) {
-        updateMap(0);
-    }
+    document.querySelectorAll('.map-mode-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.map-mode-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            currentMode = this.dataset.mode;
+            updateMap(currentDayIdx);
+        });
+    });
+    
+    updateMap('overview');
 }

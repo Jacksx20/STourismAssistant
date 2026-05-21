@@ -322,6 +322,7 @@ def plan():
                 current_time += timedelta(hours=visit_hours + travel_hours)
             
             map_url = None
+            map_spots = []
             if len(sorted_spots) >= 2:
                 from_loc = sorted_spots[0].get('location', '')
                 from_name = sorted_spots[0].get('name', '')
@@ -335,12 +336,18 @@ def plan():
                     if loc:
                         via_points.append(f"{loc},{name}")
                 
-                via_str = '|'.join(via_points) if via_points else ''
+                via_str = '|'.join(via_points[:3]) if via_points else ''
                 
                 map_url = f"https://uri.amap.com/navigation?from={from_loc},{from_name}&to={to_loc},{to_name}"
                 if via_str:
                     map_url += f"&via={via_str}"
                 map_url += f"&mode=car&callnative=0&src={city}旅行攻略&policy=0"
+                
+                for spot in sorted_spots:
+                    loc = spot.get('location', '')
+                    name = spot.get('name', '')
+                    if loc:
+                        map_spots.append({'name': name, 'location': loc})
             
             daily_plans.append({
                 'day': day_num + 1,
@@ -348,7 +355,8 @@ def plan():
                 'weather': weather_list[day_num] if day_num < len(weather_list) else {},
                 'spots': sorted_spots,
                 'schedule': schedule,
-                'map_url': map_url
+                'map_url': map_url,
+                'map_spots': map_spots
             })
         
         travel_tips = []
