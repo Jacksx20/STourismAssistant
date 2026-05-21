@@ -155,6 +155,10 @@ def plan():
                             poi['photo'] = photos[0].get('url', '')
                         if not poi.get('rating'):
                             poi['rating'] = detail_poi.get('biz_ext', {}).get('rating', '')
+                        if not poi.get('intro'):
+                            poi['intro'] = detail_poi.get('intro', '')
+                        if not poi.get('detail_url'):
+                            poi['detail_url'] = detail_poi.get('detail_url', '')
                         all_spots.append(poi)
             except:
                 continue
@@ -189,6 +193,20 @@ def plan():
             spot['score'] = score
         
         all_spots.sort(key=lambda x: x.get('score', 0), reverse=True)
+        
+        for spot in all_spots[:days * spots_per_day * 2]:
+            if spot.get('intro') and spot.get('detail_url'):
+                continue
+            try:
+                detail_result = client.search_detail(spot['id'])
+                if detail_result and 'pois' in detail_result:
+                    detail_poi = detail_result['pois'][0]
+                    if not spot.get('intro'):
+                        spot['intro'] = detail_poi.get('intro', '')
+                    if not spot.get('detail_url'):
+                        spot['detail_url'] = detail_poi.get('detail_url', '')
+            except:
+                continue
         
         type_count = {}
         diversified_spots = []
