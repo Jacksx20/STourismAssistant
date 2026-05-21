@@ -237,12 +237,12 @@ def plan():
                         if food.get('rating') and food.get('photo'):
                             food_recommendations.append(food)
                 
-                if len(food_recommendations) >= 10:
+                if len(food_recommendations) >= 12:
                     break
             except:
                 continue
         
-        food_recommendations = food_recommendations[:10]
+        food_recommendations = food_recommendations[:12]
         
         hotel_keywords = ['酒店', '宾馆', '住宿', '民宿', '客栈', '度假酒店', '商务酒店', '精品酒店']
         hotel_recommendations = []
@@ -263,12 +263,12 @@ def plan():
                         if hotel.get('rating') and hotel.get('photo'):
                             hotel_recommendations.append(hotel)
                 
-                if len(hotel_recommendations) >= 10:
+                if len(hotel_recommendations) >= 12:
                     break
             except:
                 continue
         
-        hotel_recommendations = hotel_recommendations[:10]
+        hotel_recommendations = hotel_recommendations[:12]
         
         if not all_spots:
             return jsonify({'ok': False, 'message': '未找到足够的景点信息'})
