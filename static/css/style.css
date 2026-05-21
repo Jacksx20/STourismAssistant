@@ -594,6 +594,29 @@ body::before {
     overflow: hidden;
 }
 
+.map-img-wrap {
+    width: 100%;
+    min-height: 300px;
+    border-radius: 15px;
+    overflow: hidden;
+    background: rgba(102, 126, 234, 0.05);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.map-img {
+    max-width: 100%;
+    border-radius: 15px;
+}
+
+.map-fallback {
+    padding: 40px;
+    color: #888;
+    font-size: 14px;
+    text-align: center;
+}
+
 .map-mode-tabs {
     display: flex;
     gap: 8px;
