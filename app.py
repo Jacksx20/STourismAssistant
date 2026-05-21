@@ -244,30 +244,64 @@ def plan():
         
         food_recommendations = food_recommendations[:12]
         
-        hotel_keywords = ['酒店', '宾馆', '住宿', '民宿', '客栈', '度假酒店', '商务酒店', '精品酒店']
+        hotel_type_keywords = ['星级酒店', '商务酒店', '度假酒店', '精品酒店', '民宿', '客栈', '快捷酒店']
         hotel_recommendations = []
         seen_hotel_ids = set()
         
-        for keyword in hotel_keywords:
-            try:
-                hotel_result = client.search_poi(
-                    keyword=keyword,
-                    city=city,
-                    offset=40
-                )
-                hotel_list = parse_poi_list(hotel_result)
-                
-                for hotel in hotel_list:
-                    if hotel['id'] not in seen_hotel_ids:
-                        seen_hotel_ids.add(hotel['id'])
-                        if hotel.get('rating') and hotel.get('photo'):
-                            hotel_recommendations.append(hotel)
-                
-                if len(hotel_recommendations) >= 12:
-                    break
-            except:
-                continue
+        search_locations = [center_location]
+        for spot in all_spots[:6]:
+            if spot.get('location'):
+                search_locations.append(spot['location'])
         
+        for loc in search_locations:
+            for keyword in hotel_type_keywords:
+                if len(hotel_recommendations) >= 20:
+                    break
+                try:
+                    hotel_result = client.search_nearby(
+                        keyword=keyword,
+                        location=loc,
+                        radius=5000,
+                        offset=25
+                    )
+                    hotel_list = parse_poi_list(hotel_result)
+                    
+                    for hotel in hotel_list:
+                        if hotel['id'] not in seen_hotel_ids:
+                            seen_hotel_ids.add(hotel['id'])
+                            hotel_type = hotel.get('type', '')
+                            if not any(t in hotel_type for t in ['住宿', '酒店', '宾馆', '民宿', '客栈', '旅馆']):
+                                continue
+                            try:
+                                if float(hotel.get('rating', 0)) < 3.5:
+                                    continue
+                            except:
+                                continue
+                            if hotel.get('rating') and hotel.get('photo'):
+                                hotel_recommendations.append(hotel)
+                except:
+                    continue
+            if len(hotel_recommendations) >= 20:
+                break
+        
+        for hotel in hotel_recommendations:
+            score = 0
+            try:
+                score += float(hotel.get('rating', 0)) * 10
+            except:
+                score += 30
+            hotel_type = hotel.get('type', '')
+            if '5A' in hotel_type or 'AAAAA' in hotel_type or '五星级' in hotel_type:
+                score += 50
+            elif '4A' in hotel_type or 'AAAA' in hotel_type or '四星级' in hotel_type:
+                score += 40
+            if any(t in hotel_type for t in ['星级酒店', '度假酒店', '精品酒店']):
+                score += 20
+            elif any(t in hotel_type for t in ['商务酒店', '快捷酒店']):
+                score += 10
+            hotel['score'] = score
+        
+        hotel_recommendations.sort(key=lambda x: x.get('score', 0), reverse=True)
         hotel_recommendations = hotel_recommendations[:12]
         
         if not all_spots:
