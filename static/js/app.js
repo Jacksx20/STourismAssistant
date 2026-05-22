@@ -5,9 +5,11 @@ function setDefaultDate() {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    
     const dateInput = document.getElementById('travelDate');
     const minDate = today.toISOString().split('T')[0];
     const defaultDate = tomorrow.toISOString().split('T')[0];
+    
     dateInput.min = minDate;
     dateInput.value = defaultDate;
 }
@@ -31,17 +33,27 @@ document.getElementById('testKeyBtn').addEventListener('click', async function()
     const apiKey = document.getElementById('apiKey').value.trim();
     const testBtn = this;
     const keyError = document.getElementById('keyError');
-    if (!apiKey) { keyError.textContent = '请输入API Key'; return; }
+    
+    if (!apiKey) {
+        keyError.textContent = '请输入API Key';
+        return;
+    }
+    
     testBtn.disabled = true;
     testBtn.textContent = '测试中...';
     keyError.textContent = '';
+    
     try {
         const response = await fetch('/test_key', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({ api_key: apiKey })
         });
+        
         const result = await response.json();
+        
         if (result.ok) {
             testBtn.textContent = '测试通过';
             testBtn.className = 'test-btn success';
@@ -65,16 +77,29 @@ document.getElementById('testKeyBtn').addEventListener('click', async function()
 
 document.getElementById('travelForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    if (!keyTested) { alert('请先测试API Key连接'); return; }
+    
+    if (!keyTested) {
+        alert('请先测试API Key连接');
+        return;
+    }
+    
     const days = parseInt(document.getElementById('days').value);
     const spotsPerDay = parseInt(document.getElementById('spotsPerDay').value);
-    if (days < 1 || days > 7) { alert('出行天数需在1-7之间'); return; }
-    if (spotsPerDay < 1 || spotsPerDay > 5) { alert('每天游玩景点数需在1-5之间'); return; }
-
+    
+    if (days < 1 || days > 7) {
+        alert('出行天数需在1-7之间');
+        return;
+    }
+    
+    if (spotsPerDay < 1 || spotsPerDay > 5) {
+        alert('每天游玩景点数需在1-5之间');
+        return;
+    }
+    
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true;
     document.getElementById('loadingOverlay').style.display = 'flex';
-
+    
     const progressSteps = [
         { percent: 5, step: '正在解析目的地信息...' },
         { percent: 15, step: '正在获取地理坐标...' },
@@ -87,45 +112,81 @@ document.getElementById('travelForm').addEventListener('submit', async function(
         { percent: 88, step: '正在搜索住宿推荐...' },
         { percent: 95, step: '正在生成旅行方案...' }
     ];
+    
     let progressTimer = null;
     let currentStepIdx = 0;
     const startTime = Date.now();
     const estimatedTotalMs = days * spotsPerDay * 3000 + 8000;
-
+    
     function updateProgress() {
         if (currentStepIdx >= progressSteps.length) return;
         const step = progressSteps[currentStepIdx];
-        document.getElementById('progressFill').style.width = step.percent + '%';
-        document.getElementById('progressPercent').textContent = step.percent + '%';
-        document.getElementById('progressStep').textContent = step.step;
-        const remainMs = Math.max(0, estimatedTotalMs - (Date.now() - startTime));
-        document.getElementById('progressTime').textContent = remainMs > 0 ? '预计剩余 ' + Math.ceil(remainMs / 1000) + ' 秒' : '即将完成...';
+        const fill = document.getElementById('progressFill');
+        const percentEl = document.getElementById('progressPercent');
+        const timeEl = document.getElementById('progressTime');
+        const stepEl = document.getElementById('progressStep');
+        
+        fill.style.width = step.percent + '%';
+        percentEl.textContent = step.percent + '%';
+        stepEl.textContent = step.step;
+        
+        const elapsed = Date.now() - startTime;
+        const remainMs = Math.max(0, estimatedTotalMs - elapsed);
+        if (remainMs > 0) {
+            const secs = Math.ceil(remainMs / 1000);
+            timeEl.textContent = '预计剩余 ' + secs + ' 秒';
+        } else {
+            timeEl.textContent = '即将完成...';
+        }
+        
         currentStepIdx++;
     }
+    
     updateProgress();
     progressTimer = setInterval(updateProgress, 2500);
-
+    
     const formData = {
         api_key: document.getElementById('apiKey').value.trim(),
         city: document.getElementById('city').value.trim(),
         start_date: document.getElementById('travelDate').value,
-        days: days, spots_per_day: spotsPerDay,
+        days: days,
+        spots_per_day: spotsPerDay,
         plan_type: document.getElementById('planType').value
     };
-
+    
     try {
-        const response = await fetch('/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+        const response = await fetch('/plan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
         const result = await response.json();
-        if (result.ok) { renderResult(result); document.getElementById('resultSection').style.display = 'block'; }
-        else { alert(result.message || '规划失败，请重试'); }
-    } catch (error) { alert('网络错误，请重试'); }
-    finally {
+        
+        if (result.ok) {
+            renderResult(result);
+            document.getElementById('resultSection').style.display = 'block';
+        } else {
+            alert(result.message || '规划失败，请重试');
+        }
+    } catch (error) {
+        alert('网络错误，请重试');
+    } finally {
         clearInterval(progressTimer);
-        document.getElementById('progressFill').style.width = '100%';
-        document.getElementById('progressPercent').textContent = '100%';
-        document.getElementById('progressTime').textContent = '规划完成';
-        document.getElementById('progressStep').textContent = '';
-        setTimeout(() => { submitBtn.disabled = false; document.getElementById('loadingOverlay').style.display = 'none'; }, 500);
+        const fill = document.getElementById('progressFill');
+        const percentEl = document.getElementById('progressPercent');
+        const timeEl = document.getElementById('progressTime');
+        const stepEl = document.getElementById('progressStep');
+        fill.style.width = '100%';
+        percentEl.textContent = '100%';
+        timeEl.textContent = '规划完成';
+        stepEl.textContent = '';
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }, 500);
     }
 });
 
@@ -140,179 +201,160 @@ function renderResult(data) {
         { bg: 'linear-gradient(135deg, #a18cd1, #fbc2eb)', color: '#a18cd1' },
         { bg: 'linear-gradient(135deg, #ff9a9e, #fecfef)', color: '#ff9a9e' }
     ];
-
+    
     let html = '';
-    html += `<div class="weather-card"><h2>🌤️ ${data.city} 天气预报</h2><div class="weather-grid">${data.weather.map(w => `<div class="weather-item"><div class="weather-date">${w.date}</div><div class="weather-temp">${w.daytemp}°C / ${w.nighttemp}°C</div><div class="weather-desc">${w.dayweather}</div></div>`).join('')}</div></div>`;
-
+    
+    html += `
+        <div class="weather-card">
+            <h2>🌤️ ${data.city} 天气预报</h2>
+            <div class="weather-grid">
+                ${data.weather.map(w => `
+                    <div class="weather-item">
+                        <div class="weather-date">${w.date}</div>
+                        <div class="weather-temp">${w.daytemp}°C / ${w.nighttemp}°C</div>
+                        <div class="weather-desc">${w.dayweather}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
     if (data.travel_tips && data.travel_tips.length > 0) {
-        html += `<div class="tips-section"><h2>💡 出行小贴士</h2><ul class="tips-list">${data.travel_tips.map(tip => `<li>${tip}</li>`).join('')}</ul></div>`;
+        html += `
+            <div class="tips-section">
+                <h2>💡 出行小贴士</h2>
+                <ul class="tips-list">
+                    ${data.travel_tips.map(tip => `<li>${tip}</li>`).join('')}
+                </ul>
+            </div>
+        `;
     }
-
+    
     data.daily_plans.forEach((day, idx) => {
-        const color = dayColors[idx % dayColors.length];
-        html += `<div class="day-card"><div class="day-header"><div class="day-badge" style="background: ${color.bg};">D${day.day}</div><div><div class="day-title">第${day.day}天行程</div><div class="day-date">${day.date} · ${day.weather.dayweather} ${day.weather.daytemp}°C</div></div></div>
-            <div class="spots-grid">${day.spots.map((spot, i) => `<div class="spot-card">${spot.photo ? `<img src="${spot.photo}" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:10px;" onerror="this.style.display='none'">` : ''}<div class="spot-number" style="background: ${color.bg};">${i + 1}</div><div class="spot-name">${spot.name}</div><div class="spot-address">${spot.address || '暂无地址'}</div>${spot.intro ? `<div class="spot-intro">${spot.intro.length > 60 ? spot.intro.substring(0, 60) + '...' : spot.intro}</div>` : ''}${spot.detail_url ? `<a href="${spot.detail_url}" target="_blank" class="spot-detail-link">查看详情 ></a>` : ''}</div>`).join('')}</div>
-            <div class="schedule-list">${day.schedule.map((item, i) => `<div class="schedule-item"><div class="schedule-time">${item.time}</div><div class="schedule-info"><div class="schedule-name">${item.spot.name}</div><div class="schedule-detail">游览${item.visit_hours}小时 · ${i === 0 ? '出发' : `打车${item.travel_time} · 约${item.taxi_cost}元`}</div></div></div>`).join('')}</div></div>`;
+        const colorIdx = idx % dayColors.length;
+        const color = dayColors[colorIdx];
+        
+        html += `
+            <div class="day-card">
+                <div class="day-header">
+                    <div class="day-badge" style="background: ${color.bg};">D${day.day}</div>
+                    <div>
+                        <div class="day-title">第${day.day}天行程</div>
+                        <div class="day-date">${day.date} · ${day.weather.dayweather} ${day.weather.daytemp}°C</div>
+                    </div>
+                </div>
+                
+                <div class="spots-grid">
+                    ${day.spots.map((spot, i) => `
+                        <div class="spot-card">
+                            ${spot.photo ? `<img src="${spot.photo}" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:10px;" onerror="this.style.display='none'">` : ''}
+                            <div class="spot-number" style="background: ${color.bg};">${i + 1}</div>
+                            <div class="spot-name">${spot.name}</div>
+                            <div class="spot-address">${spot.address || '暂无地址'}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="schedule-list">
+                    ${day.schedule.map((item, i) => `
+                        <div class="schedule-item">
+                            <div class="schedule-time">${item.time}</div>
+                            <div class="schedule-info">
+                                <div class="schedule-name">${item.spot.name}</div>
+                                <div class="schedule-detail">
+                                    游览${item.visit_hours}小时 · 
+                                    ${i === 0 ? '出发' : `打车${item.travel_time} · 约${item.taxi_cost}元`}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
     });
-
+    
     if (data.food_recommendations && data.food_recommendations.length > 0) {
-        html += `<div class="rec-section"><h2>🍜 美食推荐</h2><div class="rec-grid">${data.food_recommendations.map(food => `<div class="rec-item">${food.photo ? `<img src="${food.photo}" style="width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:10px;" onerror="this.style.display='none'">` : ''}<div class="rec-name">${food.name}</div>${food.rating ? `<div class="rec-rating">⭐ ${food.rating}</div>` : ''}<div class="rec-address">${food.address || '暂无地址'}</div></div>`).join('')}</div></div>`;
+        html += `
+            <div class="rec-section">
+                <h2>🍜 美食推荐</h2>
+                <div class="rec-grid">
+                    ${data.food_recommendations.map(food => `
+                        <div class="rec-item">
+                            ${food.photo ? `<img src="${food.photo}" style="width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:10px;" onerror="this.style.display='none'">` : ''}
+                            <div class="rec-name">${food.name}</div>
+                            ${food.rating ? `<div class="rec-rating">⭐ ${food.rating}</div>` : ''}
+                            <div class="rec-address">${food.address || '暂无地址'}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
     }
-
+    
     if (data.hotel_recommendations && data.hotel_recommendations.length > 0) {
-        html += `<div class="rec-section"><h2>🏨 住宿推荐</h2><div class="rec-grid">${data.hotel_recommendations.map(hotel => `<div class="rec-item">${hotel.photo ? `<img src="${hotel.photo}" style="width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:10px;" onerror="this.style.display='none'">` : ''}<div class="rec-name">${hotel.name}</div>${hotel.rating ? `<div class="rec-rating">⭐ ${hotel.rating}</div>` : ''}<div class="rec-address">${hotel.address || '暂无地址'}</div></div>`).join('')}</div></div>`;
+        html += `
+            <div class="rec-section">
+                <h2>🏨 住宿推荐</h2>
+                <div class="rec-grid">
+                    ${data.hotel_recommendations.map(hotel => `
+                        <div class="rec-item">
+                            ${hotel.photo ? `<img src="${hotel.photo}" style="width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:10px;" onerror="this.style.display='none'">` : ''}
+                            <div class="rec-name">${hotel.name}</div>
+                            ${hotel.rating ? `<div class="rec-rating">⭐ ${hotel.rating}</div>` : ''}
+                            <div class="rec-address">${hotel.address || '暂无地址'}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
     }
-
+    
     html += `
         <div class="map-section">
             <h2>🗺️ 路线地图</h2>
             <div class="map-tabs" id="mapTabs">
-                <div class="map-tab active" data-day="overview">总览</div>
                 ${data.daily_plans.map((day, idx) => {
-                    const spots = day.spots.map(s => s.name);
-                    const routeText = spots.length > 3 ? spots.slice(0, 3).join(' → ') + ' ...' : spots.join(' → ');
-                    return `<div class="map-tab" data-day="${idx}">第${day.day}天 ${routeText}</div>`;
+                    const spots = day.spots_names || day.spots.map(s => s.name);
+                    const routeText = spots.slice(0, 3).join(' → ');
+                    return `<div class="map-tab ${idx === 0 ? 'active' : ''}" data-day="${idx}">第${day.day}天 ${routeText}</div>`;
                 }).join('')}
             </div>
-            <div class="map-mode-tabs" id="mapModeTabs">
-                <div class="map-mode-tab active" data-mode="driving">🚗 驾车</div>
-                <div class="map-mode-tab" data-mode="transit">🚌 公交</div>
-                <div class="map-mode-tab" data-mode="walking">🚶 步行</div>
-            </div>
             <div class="map-description" id="mapDescription"></div>
-            <div class="map-container" id="mapContainer"></div>
-            <div class="map-img-wrap" id="mapImgWrap"></div>
-        </div>`;
-
+            <div class="map-actions">
+                <a href="#" target="_blank" class="map-btn" id="navLink">查看驾车导航</a>
+                <a href="#" target="_blank" class="map-btn" id="taxiLink">一键打车</a>
+            </div>
+            <iframe id="mapIframe" class="map-iframe" src=""></iframe>
+        </div>
+    `;
+    
     content.innerHTML = html;
-
-    const jsApiKey = document.getElementById('jsApiKey').value.trim();
-    const serverApiKey = document.getElementById('apiKey').value.trim();
+    
     const mapData = data.daily_plans.map(day => ({
         url: day.map_url,
-        spots: day.map_spots || day.spots.map(s => ({ name: s.name, location: s.location || '' })),
-        spotNames: day.spots.map(s => s.name)
+        spots: day.spots.map(s => s.name)
     }));
-
-    const useInteractive = !!jsApiKey;
-    if (useInteractive) {
-        document.getElementById('mapImgWrap').style.display = 'none';
-    } else {
-        document.getElementById('mapContainer').style.display = 'none';
-    }
-
-    const markerColors = ['#667eea', '#f5576c', '#4facfe', '#43e97b', '#fa709a', '#a18cd1', '#ff9a9e'];
-    const markerColorHex = ['0x667eea', '0xf5576c', '0x4facfe', '0x43e97b', '0xfa709a', '0xa18cd1', '0xff9a9e'];
-    let currentDayIdx = 'overview';
-    let currentMode = 'driving';
-
-    if (useInteractive) {
-        let amap = null;
-        let overlays = [];
-
-        function loadAmap() {
-            return new Promise((resolve, reject) => {
-                if (window.AMap) { resolve(); return; }
-                const s = document.createElement('script');
-                s.src = `https://webapi.amap.com/maps?v=2.0&key=${jsApiKey}&plugin=AMap.Driving,AMap.Transfer,AMap.Walking`;
-                s.onload = resolve;
-                s.onerror = reject;
-                document.head.appendChild(s);
-            });
-        }
-
-        function clearOverlays() {
-            overlays.forEach(o => { try { if (o.clear) o.clear(); else if (o.setMap) o.setMap(null); } catch(e){} });
-            overlays = [];
-        }
-
-        function addMarkers(spots, color, prefix) {
-            spots.forEach((spot, i) => {
-                if (!spot.location) return;
-                const [lng, lat] = spot.location.split(',').map(Number);
-                if (isNaN(lng) || isNaN(lat)) return;
-                const m = new AMap.Marker({
-                    position: [lng, lat], title: spot.name,
-                    label: { content: `<span style="background:${color};color:#fff;padding:2px 8px;border-radius:10px;font-size:12px;white-space:nowrap;">${prefix ? prefix + (i+1) : (i+1)}. ${spot.name}</span>`, direction: 'top' },
-                    zIndex: 100
-                });
-                amap.add(m); overlays.push(m);
-            });
-        }
-
-        function drawRoute(spots, mode) {
-            const pts = spots.filter(s => s.location).map(s => { const p = s.location.split(',').map(Number); return isNaN(p[0])||isNaN(p[1]) ? null : [p[0],p[1]]; }).filter(Boolean);
-            if (pts.length < 2) return;
-            const origin = new AMap.LngLat(pts[0][0], pts[0][1]);
-            const dest = new AMap.LngLat(pts[pts.length-1][0], pts[pts.length-1][1]);
-            const midPts = pts.slice(1, -1).map(p => new AMap.LngLat(p[0], p[1]));
-            const opts = midPts.length > 0 ? { waypoints: midPts } : undefined;
-            if (mode === 'driving') { const d = new AMap.Driving({ map: amap, autoFitView: false }); d.search(origin, dest, opts, ()=>{}); overlays.push(d); }
-            else if (mode === 'transit') { const t = new AMap.Transfer({ map: amap, autoFitView: false, city: data.city }); t.search(origin, dest); overlays.push(t); }
-            else { const w = new AMap.Walking({ map: amap, autoFitView: false }); w.search(origin, dest, opts, ()=>{}); overlays.push(w); }
-        }
-
-        async function updateMap(dayIdx) {
-            currentDayIdx = dayIdx;
-            try { await loadAmap(); } catch(e) { useInteractive = false; updateMap(dayIdx); return; }
-            if (!amap) { amap = new AMap.Map('mapContainer', { zoom: 11, resizeEnable: true }); }
-            clearOverlays();
-            if (dayIdx === 'overview') {
-                mapData.forEach((dayInfo, idx) => { addMarkers(dayInfo.spots, markerColors[idx % markerColors.length], `D${idx+1}-`); if (currentMode === 'driving') drawRoute(dayInfo.spots, 'driving'); });
-                document.getElementById('mapDescription').textContent = `总览：共${mapData.length}天行程，${mapData.reduce((s, d) => s + d.spotNames.length, 0)}个景点`;
-            } else {
-                const dayInfo = mapData[dayIdx]; if (!dayInfo) return;
-                addMarkers(dayInfo.spots, markerColors[dayIdx % markerColors.length], '');
-                drawRoute(dayInfo.spots, currentMode);
-                document.getElementById('mapDescription').textContent = `第${dayIdx + 1}天路线：${dayInfo.spotNames.join(' → ')}`;
-            }
-            amap.setFitView();
-        }
-    } else {
-        function buildStaticMapUrl(markersList) {
-            if (markersList.length === 0) return '';
-            const center = markersList[0].location;
-            const markerStr = markersList.map(m => `mid,${m.color},S:${m.label}:${m.location}`).join('|');
-            return `https://restapi.amap.com/v3/staticmap?location=${center}&zoom=11&size=800*500&markers=${encodeURIComponent(markerStr)}&key=${serverApiKey}`;
-        }
-
-        function updateMap(dayIdx) {
-            currentDayIdx = dayIdx;
-            const wrapEl = document.getElementById('mapImgWrap');
-            const descEl = document.getElementById('mapDescription');
-            let imgSrc = '';
-            if (dayIdx === 'overview') {
-                const allMarkers = [];
-                mapData.forEach((dayInfo, dayI) => { dayInfo.spots.forEach((spot, spotI) => { if (spot.location) allMarkers.push({ location: spot.location, color: markerColorHex[dayI % markerColorHex.length], label: `D${dayI+1}-${spotI+1}` }); }); });
-                imgSrc = buildStaticMapUrl(allMarkers);
-                descEl.textContent = `总览：共${mapData.length}天行程，${mapData.reduce((s, d) => s + d.spotNames.length, 0)}个景点（填写JS API Key可显示交互地图）`;
-            } else {
-                const dayInfo = mapData[dayIdx]; if (!dayInfo) return;
-                const markers = dayInfo.spots.filter(s => s.location).map((spot, i) => ({ location: spot.location, color: markerColorHex[dayIdx % markerColorHex.length], label: String(i + 1) }));
-                imgSrc = buildStaticMapUrl(markers);
-                descEl.textContent = `第${dayIdx + 1}天路线：${dayInfo.spotNames.join(' → ')}`;
-            }
-            wrapEl.innerHTML = `<img class="map-img" src="${imgSrc}" alt="路线地图" onerror="this.parentElement.innerHTML='<div class=\\'map-fallback\\'>静态地图加载失败</div>'">`;
+    
+    function updateMap(dayIdx) {
+        const mapInfo = mapData[dayIdx];
+        if (mapInfo && mapInfo.url) {
+            document.getElementById('mapIframe').src = mapInfo.url;
+            document.getElementById('navLink').href = mapInfo.url;
+            document.getElementById('taxiLink').href = mapInfo.url;
+            document.getElementById('mapDescription').textContent = 
+                `路线：${mapInfo.spots.join(' → ')}`;
         }
     }
-
+    
     document.querySelectorAll('.map-tab').forEach(tab => {
         tab.addEventListener('click', function() {
             document.querySelectorAll('.map-tab').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
-            const dayVal = this.dataset.day;
-            updateMap(dayVal === 'overview' ? 'overview' : parseInt(dayVal));
+            updateMap(parseInt(this.dataset.day));
         });
     });
-
-    document.querySelectorAll('.map-mode-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('.map-mode-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            currentMode = this.dataset.mode;
-            updateMap(currentDayIdx);
-        });
-    });
-
-    updateMap('overview');
+    
+    if (mapData.length > 0 && mapData[0].url) {
+        updateMap(0);
+    }
 }
